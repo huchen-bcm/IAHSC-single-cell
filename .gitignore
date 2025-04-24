@@ -1,0 +1,28 @@
+# Ignore everything by default
+*
+*/*
+
+# Don't ignore directories, so we can recurse into them
+!*/
+
+# Track specific script files in all directories and subdirectories
+!*.py
+!*.sh
+!*.ipynb
+!*.pl
+!*.R
+
+# Explicitly ignore dotfiles (files starting with ".")
+.*
+.*/
+
+# Exclude everything in scRNA/2.scQC/pipelines
+scRNA/2.scQC/pipelines/*
+
+# But track the directory itself (to be able to see it in git)
+!scRNA/2.scQC/pipelines/
+
+# Don't ignore git files
+!.gitignore
+!.gitattributes
+
