@@ -45,7 +45,7 @@ count_adata_ = count_adata_[:, ~count_adata_.var.index.duplicated()]
 
 count_adata_.var.index.duplicated().sum()
 
-gene_matrix = snap.read("IAHSC_gene_mat.no_imputation.h5ad", backed = None)
+gene_matrix = snap.read("IAHSC_gene_mat.WT.July18.h5ad", backed = None)
 
 gene_matrix.obs['Cell_types_major_finalized'] = pd.NA
 joint = ad.concat(
@@ -103,7 +103,7 @@ sc.pp.neighbors(joint, use_rep="X_scANVI")
 sc.tl.umap(joint)
 
 ## save the joint anndata object
-joint.write("IAHSC_joint_annotated.Cell_types_major_finalized.h5ad", compression='gzip')
+joint.write("IAHSC_gene_mat.WT.July18.Cell_types_major_finalized.h5ad", compression='gzip')
 
 
 
