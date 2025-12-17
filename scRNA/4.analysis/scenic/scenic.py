@@ -58,12 +58,15 @@ count_adata = sc.read_h5ad('/home/huc/projects/Ruoqiong_Cao.IAHSC/scRNA/3.annota
 adata_all = sc.read_h5ad('/home/huc/projects/Ruoqiong_Cao.IAHSC/scRNA/3.annotation/processed_anndata/IAHSC.scRNA.annotation_finalized.with_meta_info.Aug01.h5ad')
 adata_HSC_only = sc.read_h5ad("/home/huc/projects/Ruoqiong_Cao.IAHSC/scRNA/3.annotation/processed_anndata/IAHSC.scRNA.HSC_only.Aug15.h5ad")
 
-N_CELLS = 2000
+# N_CELLS = 2000
 
-if adata_HSC_only.n_obs > N_CELLS:
-    rng = np.random.default_rng(42)  # reproducible
-    idx = rng.choice(adata_HSC_only.n_obs, N_CELLS, replace=False)
-    adata_HSC_only = adata_HSC_only[idx, :].copy()
+# if adata_HSC_only.n_obs > N_CELLS:
+#     rng = np.random.default_rng(42)  # reproducible
+#     idx = rng.choice(adata_HSC_only.n_obs, N_CELLS, replace=False)
+#     adata_HSC_only = adata_HSC_only[idx, :].copy()
+
+
+
 
 
 ## Get the counts
