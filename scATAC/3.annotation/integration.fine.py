@@ -14,7 +14,6 @@ from plotly.subplots import make_subplots
 
 
 sys.path.append(os.path.abspath('/home/huc/projects/scAuto/scAnnotation'))
-# sys.path.append(os.path.abspath('/home/huc/projects/scAuto/scQC'))
 sys.path.append(os.path.abspath('/home/huc/projects/scRNA_resources/markers'))
 
 import scAnnotation_helpers as scAnnotation_helpers
@@ -45,7 +44,7 @@ count_adata_ = count_adata_[:, ~count_adata_.var.index.duplicated()]
 
 count_adata_.var.index.duplicated().sum()
 
-gene_matrix = snap.read("IAHSC_gene_mat.WT.July18.h5ad", backed = None)
+gene_matrix = snap.read("/home/huc/projects/Ruoqiong_Cao.IAHSC/scATAC/3.annotation/gene_activity_WT.annotation.finalized.Nov03_copy.h5ad", backed = None)
 
 gene_matrix.obs['Cell_types_fine_finalized'] = pd.NA
 joint = ad.concat(
@@ -59,7 +58,7 @@ joint = ad.concat(
 sc.pp.filter_genes(joint, min_cells=5)
 sc.pp.highly_variable_genes(
     joint,
-    n_top_genes = 5000,
+    n_top_genes = 2000,
     flavor="seurat_v3",
     batch_key="modality",
     subset=True
@@ -70,11 +69,10 @@ scvi.model.SCVI.setup_anndata(joint, batch_key="modality")
 vae = scvi.model.SCVI(
     joint,
     n_layers=2,
-    n_latent=30,
+    n_latent=50,
     gene_likelihood="nb",
     dispersion="gene-batch",
 )
-
 
 vae.train(max_epochs=1000, early_stopping=True)
 
@@ -103,15 +101,4 @@ sc.pp.neighbors(joint, use_rep="X_scANVI")
 sc.tl.umap(joint)
 
 ## save the joint anndata object
-joint.write("IAHSC_gene_mat.WT.July18.Cell_types_fine_finalized.h5ad", compression='gzip')
-
-
-
-# atac.obs['cell_type'] = joint.obs.loc[atac.obs_names + '_query']['C_scANVI'].to_numpy()
-
-
-
-# sc.pl.umap(atac, color=['cell_type', "leiden"], wspace=0.45)
-
-
-# atac.write("pbmc5k_annotated.h5ad", compression="gzip")
+joint.write("/home/huc/projects/Ruoqiong_Cao.IAHSC/scATAC/3.annotation/joint_0118_2026.h5ad", compression='gzip')
