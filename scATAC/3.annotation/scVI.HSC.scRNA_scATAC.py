@@ -12,7 +12,7 @@ import scvi
 import sys
 from plotly.subplots import make_subplots
 
-
+# Load custom helper functions
 sys.path.append(os.path.abspath('/home/huc/projects/scAuto/scAnnotation'))
 sys.path.append(os.path.abspath('/home/huc/projects/scRNA_resources/markers'))
 
@@ -24,36 +24,44 @@ import importlib
 importlib.reload(scAnnotation_helpers)
 importlib.reload(marker_helpers)
 
+# Load marker list
 marker_yaml_file = "/home/huc/projects/scRNA_resources/markers/marker_collections/mouse_bone_marrow.yaml"
 
-
-scRNA = sc.read_h5ad("/home/huc/projects/Ruoqiong_Cao.IAHSC/scRNA/3.annotation/processed_anndata/IAHSC.scRNA.annotation_finalized.June16.h5ad")
-scRNA_count_data = sc.read_h5ad("/home/huc/projects/Ruoqiong_Cao.IAHSC/scRNA/3.annotation/processed_anndata/merged_unintegrated.h5ad")
-
-cell_indices = scRNA.obs.index.tolist()
-count_adata_ = scRNA_count_data[cell_indices, ]
-count_adata_.obs['Cell_types_fine_finalized']= scRNA.obs['Cell_types_fine_finalized'].tolist()
-
+# Load gene annotation
 gtf_path = "/home/huc/projects/ref_genome/Mus_musculus/refdata-cellranger-arc-mm10-2020-A-2.0.0/genes/genes.gtf.gz"
 organism = "mouse"
 gencode_data, mito_g, ribo_g, cyc_g = scAnnotation_helpers.process_gene_annotation(gtf_path, organism = organism)
 
+
+# Load scRNA-seq data
+scRNA = sc.read_h5ad("/home/huc/projects/Ruoqiong_Cao.IAHSC/scRNA/3.annotation/processed_anndata/IAHSC.scRNA.annotation_finalized.June16.h5ad")
+scRNA_count_data = sc.read_h5ad("/home/huc/projects/Ruoqiong_Cao.IAHSC/scRNA/3.annotation/processed_anndata/merged_unintegrated.h5ad")
+cell_indices = scRNA.obs.index.tolist()
+count_adata_ = scRNA_count_data[cell_indices, ]
+count_adata_.obs['Cell_types_fine_finalized']= scRNA.obs['Cell_types_fine_finalized'].tolist()
 count_adata_.var.index = gencode_data.drop_duplicates('gene').set_index('gene').reindex(index=count_adata_.var.index)['name'].tolist()
 count_adata_ = count_adata_[:, ~count_adata_.var.index.duplicated()]
-# count_adata_.var.index = gencode_data.drop_duplicates('gene').set_index('gene').reindex(index=count_adata_.var.index)['name'].tolist()
-
 count_adata_.var.index.duplicated().sum()
+
+# Load scATAC-seq gene activity matrix
+scATAC_HSC_WT = snap.read_dataset("/home/huc/projects/Ruoqiong_Cao.IAHSC/scATAC/3.annotation/snap_HSC_subset/HSC_dataset_new2.h5ads")
+scATAC_HSC_WT_GeneAct = snap.pp.make_gene_matrix(scATAC_HSC_WT, gene_anno=snap.genome.mm10)
+scATAC_HSC_WT.close()
+
 
 gene_matrix = snap.read("/home/huc/projects/Ruoqiong_Cao.IAHSC/scATAC/3.annotation/gene_activity_WT.annotation.finalized.Nov03_copy.h5ad", backed = None)
 
-gene_matrix.obs['Cell_types_fine_finalized'] = pd.NA
+# Integration
+scATAC_HSC_WT_GeneAct.obs['Cell_types_fine_finalized'] = pd.NA
+
 joint = ad.concat(
-    [count_adata_, gene_matrix],
+    [count_adata_, scATAC_HSC_WT_GeneAct],
     join='inner',
     label='modality',
     keys=["scRNA", "scATAC"],
     index_unique='_',
 )
+
 
 sc.pp.filter_genes(joint, min_cells=5)
 sc.pp.highly_variable_genes(
@@ -65,7 +73,6 @@ sc.pp.highly_variable_genes(
 )
 
 scvi.model.SCVI.setup_anndata(joint, batch_key="modality")
-# scvi.model.SCVI.setup_anndata(joint, batch_key="modality", layer = "counts")
 vae = scvi.model.SCVI(
     joint,
     n_layers=2,
@@ -77,8 +84,6 @@ vae = scvi.model.SCVI(
 vae.train(max_epochs=1000, early_stopping=True)
 
 
-# ax = vae.history['elbo_train'][1:].plot()
-# vae.history['elbo_validation'].plot(ax=ax)
 
 joint.obs["celltype_scanvi"] = 'Unknown'
 ref_idx = joint.obs['modality'] == "scRNA"
@@ -97,8 +102,19 @@ lvae.train(max_epochs=1000, n_samples_per_label=100)
 joint.obs["C_scANVI"] = lvae.predict(joint)
 joint.obsm["X_scANVI"] = lvae.get_latent_representation(joint)
 
-sc.pp.neighbors(joint, use_rep="X_scANVI")
-sc.tl.umap(joint)
+# sc.pp.neighbors(joint, use_rep="X_scANVI")
+# sc.tl.umap(joint)
 
 ## save the joint anndata object
-joint.write("/home/huc/projects/Ruoqiong_Cao.IAHSC/scATAC/3.annotation/joint_0118_2026.h5ad", compression='gzip')
+joint.write("/home/huc/projects/Ruoqiong_Cao.IAHSC/scATAC/3.annotation/HSC.scVI.scRNA_scATAC_integrated.0203_2026.h5ad", compression='gzip')
+
+
+## save models
+import os
+save_path = "./HSC_scVI_scRNA_scATAC_scanvi_model_0203_2026"
+
+# Create the directory if it doesn't exist
+if not os.path.exists(save_path):
+    os.makedirs(save_path)
+
+lvae.save(save_path, overwrite=True)
