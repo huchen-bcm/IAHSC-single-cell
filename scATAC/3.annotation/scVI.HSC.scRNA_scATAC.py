@@ -42,6 +42,14 @@ count_adata_.obs['Cell_types_fine_finalized']= scRNA.obs['Cell_types_fine_finali
 count_adata_.var.index = gencode_data.drop_duplicates('gene').set_index('gene').reindex(index=count_adata_.var.index)['name'].tolist()
 count_adata_ = count_adata_[:, ~count_adata_.var.index.duplicated()]
 count_adata_.var.index.duplicated().sum()
+meta_table = pd.read_csv("/home/huc/projects/Ruoqiong_Cao.IAHSC/scRNA/3.annotation/sample_meta.txt", sep="\t")
+meta_table = meta_table.astype(str)
+count_adata_.obs = count_adata_.obs.merge(meta_table.set_index('SampleID'), left_on='sample', right_index=True, how='left')
+count_adata_ = count_adata_[count_adata_.obs['Genotype'] == 'WT', :]
+
+# only consider HSC
+count_adata_ = count_adata_[count_adata_.obs['Cell_types_fine_finalized'].isin(['ST-HSC', "LT-HSC", "Cd41+ HSC", "IA-HSC"]), :]
+
 
 # Load scATAC-seq gene activity matrix
 scATAC_HSC_WT = snap.read_dataset("/home/huc/projects/Ruoqiong_Cao.IAHSC/scATAC/3.annotation/snap_HSC_subset/HSC_dataset_new2.h5ads")
@@ -66,7 +74,7 @@ joint = ad.concat(
 sc.pp.filter_genes(joint, min_cells=5)
 sc.pp.highly_variable_genes(
     joint,
-    n_top_genes = 2000,
+    n_top_genes = 3000,
     flavor="seurat_v3",
     batch_key="modality",
     subset=True
@@ -106,12 +114,12 @@ joint.obsm["X_scANVI"] = lvae.get_latent_representation(joint)
 # sc.tl.umap(joint)
 
 ## save the joint anndata object
-joint.write("/home/huc/projects/Ruoqiong_Cao.IAHSC/scATAC/3.annotation/HSC.scVI.scRNA_scATAC_integrated.0203_2026.h5ad", compression='gzip')
+joint.write("/home/huc/projects/Ruoqiong_Cao.IAHSC/scATAC/3.annotation/HSC.scVI.scRNA_scATAC_integrated.0204_2026_v2.h5ad", compression='gzip')
 
 
 ## save models
 import os
-save_path = "./HSC_scVI_scRNA_scATAC_scanvi_model_0203_2026"
+save_path = "./HSC_scVI_scRNA_scATAC_scanvi_model_0204_2026_v2"
 
 # Create the directory if it doesn't exist
 if not os.path.exists(save_path):
