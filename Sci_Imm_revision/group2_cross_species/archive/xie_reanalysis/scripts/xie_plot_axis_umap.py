@@ -1,0 +1,95 @@
+import scanpy as sc
+import numpy as np
+import pandas as pd
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from matplotlib.gridspec import GridSpec
+
+XIE_OUT = '/home/huc/projects/Ruoqiong_Cao.IAHSC/Sci_Imm_revision/group2_cross_species/xie_reanalysis'
+XIE_SRC = '/home/huc/projects/Ruoqiong_Cao.IAHSC/scRNA/4.analysis/human_data/Xie'
+
+adata = sc.read_h5ad(f'{XIE_SRC}/adata_merged_Xie_mouse_orthologs_hvg_integrated.best_model.h5ad')
+obs = pd.read_csv('/tmp/xie_merged_obs.csv', index_col=0)
+assert (adata.obs_names == obs.index).all()
+
+embed_all = np.load('/tmp/xie_embed_all100.npy')
+embed30 = embed_all[:, :30]
+mouse_mask = (obs['system'] == 'mouse').values
+human_mask = (obs['system'] == 'human').values
+ia_mask = (obs['HSC_subclass'] == 'IA-HSC').values
+lt_mask = (obs['HSC_subclass'] == 'LT-HSC').values
+d = embed30[ia_mask].mean(axis=0) - embed30[lt_mask].mean(axis=0)
+d = d / np.linalg.norm(d)
+proj = embed30 @ d
+
+umap = adata.obsm['X_umap']
+
+fig = plt.figure(figsize=(13.5, 9))
+gs = GridSpec(2, 2, height_ratios=[2.1, 1.2], width_ratios=[1, 1], hspace=0.32, wspace=0.18)
+
+vmax = np.percentile(np.abs(proj), 97)
+
+ax0 = fig.add_subplot(gs[0, 0])
+ax0.scatter(umap[human_mask, 0], umap[human_mask, 1], s=2, color='#e3e1da', linewidth=0, rasterized=True)
+sc0 = ax0.scatter(umap[mouse_mask, 0], umap[mouse_mask, 1], c=proj[mouse_mask], cmap='RdBu_r',
+                   vmin=-vmax, vmax=vmax, s=3, linewidth=0, rasterized=True)
+ax0.set_title('Mouse cells (human cells in grey)\ncolored by projection on IA-HSC↔LT-HSC axis', fontsize=11, fontweight='bold')
+ax0.set_xticks([]); ax0.set_yticks([])
+for spine in ax0.spines.values(): spine.set_visible(False)
+
+ax1 = fig.add_subplot(gs[0, 1])
+ax1.scatter(umap[mouse_mask, 0], umap[mouse_mask, 1], s=2, color='#e3e1da', linewidth=0, rasterized=True)
+sc1 = ax1.scatter(umap[human_mask, 0], umap[human_mask, 1], c=proj[human_mask], cmap='RdBu_r',
+                   vmin=-vmax, vmax=vmax, s=3, linewidth=0, rasterized=True)
+ax1.set_title('Human (Xie) cells (mouse cells in grey)\ncolored by the SAME mouse-derived axis', fontsize=11, fontweight='bold')
+ax1.set_xticks([]); ax1.set_yticks([])
+for spine in ax1.spines.values(): spine.set_visible(False)
+
+cbar = fig.colorbar(sc1, ax=[ax0, ax1], orientation='horizontal', fraction=0.035, pad=0.02, aspect=40)
+cbar.set_label('Projection onto mouse (IA-HSC − LT-HSC) latent axis  →  more IA-HSC-like')
+
+ax2 = fig.add_subplot(gs[1, :])
+obs2 = obs.copy()
+obs2['proj'] = proj
+mouse_order = ['IA-HSC', 'Cd41+ HSC', 'ST-HSC', 'LT-HSC']
+human_order = ['HSCMPP_2', 'HSCMPP_2_Cycle', 'HSCMPP_1', 'CLP', 'Prog_Cycle_2', 'Mk_P',
+               'Prog_Cycle_1', 'Prog_Cycle_3', 'LMPP', 'MEP', 'GMP', 'Ery_P', 'Mast_P']
+
+groups = []
+for g in mouse_order:
+    groups.append(('mouse:' + g, obs2.loc[mouse_mask, 'proj'][obs2.loc[mouse_mask, 'HSC_subclass'].values == g]))
+for g in human_order:
+    groups.append(('human:' + g, obs2.loc[human_mask, 'proj'][obs2.loc[human_mask, 'Cluster'].values == g]))
+
+positions = list(range(len(groups)))
+data = [g[1].values for g in groups]
+labels = [g[0] for g in groups]
+colors = []
+for name, _ in groups:
+    if name.split(':')[1] in ('HSCMPP_2', 'HSCMPP_2_Cycle'):
+        colors.append('#c0562f')
+    elif name.startswith('mouse'):
+        colors.append('#5b7fa6')
+    else:
+        colors.append('#9aa0a6')
+
+parts = ax2.violinplot(data, positions=positions, showmeans=True, showextrema=False, widths=0.8)
+for i, pc in enumerate(parts['bodies']):
+    pc.set_facecolor(colors[i])
+    pc.set_alpha(0.75)
+    pc.set_edgecolor('none')
+parts['cmeans'].set_color('black')
+parts['cmeans'].set_linewidth(1.2)
+
+ax2.axvline(len(mouse_order) - 0.5, color='black', lw=1, linestyle='--', alpha=0.4)
+ax2.axhline(0, color='black', lw=0.6)
+ax2.set_xticks(positions)
+ax2.set_xticklabels(labels, rotation=45, ha='right', fontsize=9)
+ax2.set_ylabel('Projection onto axis')
+ax2.set_title('Same axis, shown per population (mouse left of dashed line, Xie human right)', fontsize=11, fontweight='bold')
+
+plt.tight_layout()
+plt.savefig(f'{XIE_OUT}/assets/xie_axis_projection_umap.pdf', facecolor='white', bbox_inches='tight')
+plt.savefig(f'{XIE_OUT}/assets/xie_axis_projection_umap.png', dpi=200, facecolor='white', bbox_inches='tight')
+print('saved')
